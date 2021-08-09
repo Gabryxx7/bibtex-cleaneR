@@ -82,6 +82,7 @@ bib_df <- updateReferences(..., multithreaded = TRUE)
 5. Use `CTRL+F` on the output file and look for `{NO}` to double check the entries that have not been updated
 
 ## Options
+- `style`: The reference style to use, you look at the list of available styles by calling `rcrossref::get_styles()`
 - `upd_bibkey`: Whether to updated the bibkey or not. The bibkey is the identifier at the beginning of the ref.
 (If you have already cited the references in your LaTeX I'd leave this as `FALSE` so you won't need to updated your `\cite{...}` in LaTeX)
 E.g. `Marini_2019` is the bibkey here:
