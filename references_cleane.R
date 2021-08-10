@@ -12,6 +12,24 @@ library(rcrossref)
 library(aRxiv)
 library(foreach)
 library(doParallel)
+library(doSNOW)
+
+getAbstractFromDOI <- function(doi){
+  cat("\nGetting abstract for DOI: ", doi)
+  tryCatch({
+    abstr <- cr_abstract(doi =doi)
+    return(abstr)
+  },
+  error = function(e){ 
+    cat("\nError getting abstract for doi: ", paste0(e))
+    return(NULL)
+  },
+  warning  = function(e){ 
+    cat("\nWarning getting abstract for doi: ", paste0(e))
+    return(NULL)
+  })
+  return(NULL)
+}
 
 getCitationFromDOI <- function(doi,  style="acm", locale="en-US"){
   cat("\nGetting citation for DOI: ", doi, "\tStyle: ", style, "\tLocale: ", locale)
@@ -23,11 +41,11 @@ getCitationFromDOI <- function(doi,  style="acm", locale="en-US"){
     return(new_citation)
   },
   error = function(e){ 
-    cat("\nError getting new doi: ", paste0(e))
+    cat("\nError getting citation for doi: ", paste0(e))
     return(NULL)
   },
   warning  = function(e){ 
-    cat("\nWarning getting new doi: ", paste0(e))
+    cat("\nWarning getting citation for doi: ", paste0(e))
     return(NULL)
   })
   return(NULL)
@@ -39,15 +57,18 @@ getTitleSimilarity <- function(old_title, new_title, sim_threshold=0.8){
     clean_new <- tolower(gsub("[^0-9A-Za-z ]","" ,new_title, ignore.case = TRUE))
     sim <- levenshteinSim(clean_new, clean_old)
     if(sim >= sim_threshold){
+      cat("\n- Same title: YES! (Similarity: ", sim, " >= ", sim_threshold, "\n")
       return(TRUE)
     }
     else if(grepl(clean_new, clean_old, fixed = FALSE)){
+      cat("\n- Same title: YES! (New title included fully in old title)\n")
       return(TRUE)
     }
   }, error = function(e){
-    cat("\nError calculating title similarity: ", paste0(e))
+    cat("\n- Same title: ERROR, ", paste0(e), "\n")
     return(FALSE)
   })
+  cat("\n- Same title: NO!\n")
   return(FALSE)
 }
 
@@ -157,7 +178,7 @@ cleanDoiUrl <- function(doi=NULL, url=NULL){
 }
 
 
-updateBibEntry <- function(bib_data, index, out_file, style="acm", upd_bibkey=FALSE, upd_title=FALSE, upd_author=TRUE, is_cluster=FALSE){
+updateBibEntry <- function(bib_data, index, out_file, style="acm", upd_bibkey=FALSE, upd_title=FALSE, upd_author=TRUE, upd_abstract=FALSE, is_cluster=FALSE){
   if(is_cluster){
     source("references_cleane.R")
   }
@@ -195,8 +216,8 @@ updateBibEntry <- function(bib_data, index, out_file, style="acm", upd_bibkey=FA
         cat("\nGetting data for DOI ", j, " of ", length(dois), ":\t", doi, "\n")
         ref <- getCitationFromDOI(doi, style)
         if(!is.null(ref)){
+          cat("\n- Current Title: ", bib_entry$title,"\n- New Title: ", ref$title)
           same_title <- getTitleSimilarity(bib_entry$title, ref$title, similarity_threshold)
-          cat("\n- Current Title: ", bib_entry$title,"\n- New Title: ", ref$title, "\n- Same title?: ", same_title, "\n")
           if(same_title){
             cat("\nGetting new Reference")
             new_entry <- ref
@@ -215,6 +236,14 @@ updateBibEntry <- function(bib_data, index, out_file, style="acm", upd_bibkey=FA
   if(!is.null(new_entry) && length(new_entry) > 0){
     tryCatch({
       bib_entry <- mergeReferencesClass(bib_entry, new_entry, upd_bibkey, upd_title, upd_author, verbose=FALSE)
+      if(upd_abstract){
+        new_abstr <- getAbstractFromDOI(bib_entry$doi)
+        tryCatch({
+          bib_entry[["abstract"]] <- new_abstr
+        }, error = function(e) {
+          cat("\nError updating abstract: ", paste0(e))
+        })
+      }
       bib_entry[["r_updated"]] <- "YES"
       cat("\nUpdating OLD Reference")
       updated <- TRUE

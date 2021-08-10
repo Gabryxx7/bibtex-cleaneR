@@ -82,9 +82,11 @@ bib_df <- updateReferences(..., multithreaded = TRUE)
 5. Use `CTRL+F` on the output file and look for `{NO}` to double check the entries that have not been updated
 
 ## Options
-- `style`: The reference style to use, you look at the list of available styles by calling `rcrossref::get_styles()`
-- `upd_bibkey`: Whether to updated the bibkey or not. The bibkey is the identifier at the beginning of the ref.
-(If you have already cited the references in your LaTeX I'd leave this as `FALSE` so you won't need to updated your `\cite{...}` in LaTeX)
+- `multithreaded`: If `TRUE` it will create a cluster for each worker to call crossref asynchronously.
+- `workers_log_folder`: The folder where individual log files for each worker will be stored (files are deleted whenever the script is run)
+- `style`: The reference style to use, you can have a look at the list of available styles by calling `rcrossref::get_styles()`
+- `upd_bibkey`: Whether to update the bibkey or not. The bibkey is the identifier at the beginning of the ref.
+(If you have already cited the references in your LaTeX I'd leave this as `FALSE` so you won't need to update your `\cite{...}` in LaTeX)
 E.g. `Marini_2019` is the bibkey here:
 ```BibTex
 @InProceedings{Marini_2019,
@@ -109,6 +111,6 @@ E.g. `Marini_2019` is the bibkey here:
     r_updated	= {YES},
 }
 ```
-
+- `upd_abstract`: Whether to look for the abstract and update it or not (if `FALSE` the abstract won't be retreived from crossref)
 - `sorting_key`: The key to use to sort the references before outputting to file. If `NULL` or `file` it will follow the input file's order
--`decreasing`: Sorting order based on the key above (won't work if sorting key is null or file)
+- `decreasing`: Sorting order based on the key above (won't work if sorting key is null or file)

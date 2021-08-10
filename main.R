@@ -22,8 +22,19 @@ writeReferencesDf <- function(bib_df, out_filename){
     })
   }
 }
+# 
+# combineProgress <- function(iterator){
+#   pb <- txtProgressBar(min = 1, max = iterator - 1, style = 3)
+#   count <- 0
+#   function(...) {
+#     count <<- count + length(list(...)) - 1
+#     setTxtProgressBar(pb, count)
+#     flush.console()
+#     cbind(...) # this can feed into .combine option of foreach
+#   }
+# }
 
-updateReferences <- function(bib_filename, out_filename, style="acm", upd_bibkey=FALSE, upd_title=FALSE, upd_author=TRUE, sorting_key=NULL, decreasing=FALSE, multithreaded=TRUE){
+updateReferences <- function(bib_filename, out_filename, style="acm", upd_bibkey=FALSE, upd_title=FALSE, upd_author=TRUE, upd_abstract=FALSE, sorting_key=NULL, decreasing=FALSE, multithreaded=TRUE, workers_log_folder=".\\"){
   source("references_cleane.R")
   start_time <- Sys.time()
   bib_data <- ReadBib(bib_filename, check=FALSE) # best way to parse
@@ -34,7 +45,7 @@ updateReferences <- function(bib_filename, out_filename, style="acm", upd_bibkey
     method <- "Single"
     str_list <- foreach(i=1:length(bib_data)) %do% {
       tryCatch({
-        updateBibEntry(bib_data, i, out_filename, style, upd_bibkey, upd_title, upd_author, is_cluster=FALSE)
+        updateBibEntry(bib_data, i, out_filename, style, upd_bibkey, upd_title, upd_author, upd_abstract, is_cluster=FALSE)
       },error= function(e){
         cat("\nError in updating bib entry ", names(bib_data[[i]]), ":", paste0(e))
       })
@@ -43,19 +54,26 @@ updateReferences <- function(bib_filename, out_filename, style="acm", upd_bibkey
   else{
     method <- "Multi"
     cores=detectCores()
+    cat("\n",cores[1]-1," Workers log to: ", workers_log_folder, "... Cleaning up folder...")
+    dir.create(file.path(workers_log_folder), showWarnings = FALSE)
+    do.call(file.remove, list(list.files(workers_log_folder, full.names = TRUE, pattern="*.log")))
     cl <- makeCluster(cores[1]-1) #not to overload your computer
     registerDoParallel(cl)
-    errors <- c()
     str_list <- foreach(i=1:length(bib_data)) %dopar% {
       source("references_cleane.R")
+      if(!exists("log_file_initialized")){
+        log_filename <- paste0(length(list.files(workers_log_folder, full.names = FALSE))+1, ".log")
+        file.create(paste0(workers_log_folder, log_filename))
+        sink(paste0(workers_log_folder, log_filename), append = FALSE)   
+        log_file_initialized <- TRUE
+      }
       tryCatch({
-        updateBibEntry(bib_data, i, out_filename, style,upd_bibkey, upd_title, upd_author, is_cluster=TRUE)
+        entry <- updateBibEntry(bib_data, i, out_filename, style, upd_bibkey, upd_title, upd_author, upd_abstract, is_cluster=TRUE)
+        return(entry)
       },error= function(e){
-        errors <- c(errors, paste0(e))
         cat("\nError in updating bib entry ", names(bib_data[[i]]), ":", paste0(e))
       })
     }
-    cat(paste0(errors, collapse="\n\n-"))
     stopCluster(cl)
   }
   
@@ -64,12 +82,14 @@ updateReferences <- function(bib_filename, out_filename, style="acm", upd_bibkey
   cat("\nTotal unlisted Refs before sorting: ", length(ref_list))
   df <- data.table::rbindlist(ref_list, fill=TRUE)
   sorting_key <- tolower(sorting_key)
+  df[is.na(df$r_updated)]$r_updated <- "NO"
   if(length(sorting_key) > 0 && sorting_key != "file"){
     df <- df[order(df[[sorting_key]], decreasing = decreasing)]
   }
   
   # writeReferences(str_list, out_filename)
   writeReferencesDf(df, out_filename)
+  cat("\nReferences written to file: ", out_filename, "\n")
   
   end_time <- Sys.time()
   cat("\n\n", method, "threaded execution time: ", end_time - start_time, "\n\n")
