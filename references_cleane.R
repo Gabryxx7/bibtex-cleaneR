@@ -52,6 +52,7 @@ getCitationFromDOI <- function(doi,  style="acm", locale="en-US"){
 }
 
 getTitleSimilarity <- function(old_title, new_title, sim_threshold=0.8){
+  sim <- -1
   tryCatch({
     clean_old <- tolower(gsub("[^0-9A-Za-z ]","" ,old_title, ignore.case = TRUE))
     clean_new <- tolower(gsub("[^0-9A-Za-z ]","" ,new_title, ignore.case = TRUE))
@@ -68,7 +69,7 @@ getTitleSimilarity <- function(old_title, new_title, sim_threshold=0.8){
     cat("\n- Same title: ERROR, ", paste0(e), "\n")
     return(FALSE)
   })
-  cat("\n- Same title: NO!\n")
+  cat("\n- Same title: NO! (Similarity: ", sim, " >= ", sim_threshold, "\n")
   return(FALSE)
 }
 
@@ -155,6 +156,9 @@ mergeReferencesDF <- function(old_bib, new_bib, upd_bibkey=FALSE, upd_title=FALS
             cat("\nUpdating field", field, "\t\'", paste0(old_bib[[field]]), "\' => \'", paste0(replacement), "\'")
           }
           old_bib[[field]] <- replacement
+        }
+        else{
+          cat("\nNOT updating field (new is empty)", field, "\t\'", paste0(old_bib[[field]]), "\' => \'", paste0(replacement), "\'")
         }
       }, error = function(e){
         cat("\n--Error updating DF ", field, ": ", paste0(e))
