@@ -142,18 +142,22 @@ mergeReferencesClass <- function(old_bib, new_bib, upd_bibkey=FALSE, upd_title=F
   return(old_bib_unclassed)
 }
 
-mergeReferencesDF <- function(old_bib, new_bib, upd_title=FALSE, upd_authors=TRUE){
-  old_title <- str_replace_all(tolower(old_title),"[:|{|}]", "")
-  new_title <- str_replace_all(tolower(new_bib$title),"[:|{|}]", "")
-  for(col in colnames(new_bib)){
-    if(is.na(old_bib[col])){
-      old_bib[col] <- str_replace_all(new_bib[col], "[{|}]", "")
+mergeReferencesDF <- function(old_bib, new_bib, upd_bibkey=FALSE, upd_title=FALSE, upd_authors=TRUE, verbose=FALSE){
+  for(field in colnames(new_bib)){
+    if(field == "title" && !upd_title || field == "author" && !upd_authors){
+      cat("\n--Not Updating ", field)
+      next
     }
-    if(col == "TITLE" && upd_title){
-      old_bib[col] <- str_replace_all(new_bib[col], "[{|}]", "")
-    }else if(col == "AUTHOR" && upd_authors){
-      old_bib[col] <- str_replace_all(new_bib[col], "[{|}]", "")
+    if(verbose){
+      cat("Updating field", field, "\tOld: ", paste0(old_bib[[field]]), "\tNew: ", paste0(new_bib[[field]]), "\n")
     }
+    if(!is.null(new_bib[[field]]) && !is.na(new_bib[[field]])){
+      old_bib[[field]] <- str_replace_all(new_bib[[field]], "[{|}]", "")
+    }
+  }
+  if(upd_bibkey){
+    cat("\n--Updating bibkey: ", old_bib[["bibkey"]], "=>", new_bib[["bibkey"]] )
+    old_bib[["bibkey"]] <- new_bib[["bibkey"]] 
   }
   return(old_bib)
 }
@@ -182,10 +186,10 @@ updateBibEntry <- function(bib_data, index, out_file, style="acm", upd_bibkey=FA
   if(is_cluster){
     source("references_cleane.R")
   }
-  bib_entry <- bib_data[[index]]
-  bib_key <- names(bib_entry)
+  bib_entry <- bib_data[index]
+  bib_key <- bib_entry$bibkey
   new_entry <- NULL
-  cat("\n----------- Exporting", index, "/", length(bib_data), ". ", bib_key, ": ", bib_entry$title, "-----------")
+  cat("\n----------- Exporting", index, "/", nrow(bib_data), ". ", bib_key, ": ", bib_entry$title, "-----------")
   field <- "doi"
   doi <- cleanDoiUrl(doi=bib_entry$doi)
   title <- str_replace_all(bib_entry$title, "[{|}]", "")
@@ -220,7 +224,7 @@ updateBibEntry <- function(bib_data, index, out_file, style="acm", upd_bibkey=FA
           same_title <- getTitleSimilarity(bib_entry$title, ref$title, similarity_threshold)
           if(same_title){
             cat("\nGetting new Reference")
-            new_entry <- ref
+            new_entry <- as.data.frame(getReferenceListData(ref))
             break
           }
         }
@@ -235,7 +239,8 @@ updateBibEntry <- function(bib_data, index, out_file, style="acm", upd_bibkey=FA
   updated <- FALSE
   if(!is.null(new_entry) && length(new_entry) > 0){
     tryCatch({
-      bib_entry <- mergeReferencesClass(bib_entry, new_entry, upd_bibkey, upd_title, upd_author, verbose=FALSE)
+      # bib_entry <- mergeReferencesClass(bib_entry, new_entry, upd_bibkey, upd_title, upd_author, verbose=FALSE)
+      bib_entry <- mergeReferencesDF(bib_entry, new_entry, upd_bibkey, upd_title, upd_author, verbose=FALSE)
       if(upd_abstract){
         new_abstr <- getAbstractFromDOI(bib_entry$doi)
         tryCatch({
@@ -264,9 +269,9 @@ updateBibEntry <- function(bib_data, index, out_file, style="acm", upd_bibkey=FA
   # entry_str <- getReferenceString(bib_entry, tolower(attr(bibentry, "bibtype")), tolower(attr(bibentry, "key")))
   # write(entry_str, file = out_file, append = TRUE)
   cat("\n-----------------------------------------\n")
-  entry_data <- getReferenceListData(bib_entry)
-  ret_list <- list(bib_key=entry_data)
-  names(ret_list) <- bib_key
+  # entry_data <- getReferenceListData(bib_entry)
+  ret_list <- list(bib_key=bib_entry)
+  # names(ret_list) <- bib_key
   return(ret_list)
 }
 

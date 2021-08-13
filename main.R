@@ -1,4 +1,5 @@
-writeReferencesStr <- function(str_list, out_filename){
+writeReferencesStr <- function(str_list, out_filename, append=FALSE){
+  if(!append) write("", file = out_filename, append = FALSE)
   foreach(i=1:length(bib_data)) %do% {
     tryCatch({
       bib_key <- names(bib_data[[i]])
@@ -10,7 +11,8 @@ writeReferencesStr <- function(str_list, out_filename){
   }
 }
 
-writeReferencesDf <- function(bib_df, out_filename){
+writeReferencesDf <- function(bib_df, out_filename, append=FALSE){
+  if(!append) write("", file = out_filename, append = FALSE)
   foreach(i=1:nrow(bib_df)) %do% {
     tryCatch({
       bib_key <- bib_df[[i, "bibkey"]]
@@ -21,6 +23,7 @@ writeReferencesDf <- function(bib_df, out_filename){
       cat("\nError printing reference", bib_key, ":", paste0(e))
     })
   }
+  cat("\n", nrow(bib_df), "References written to file: ", out_filename, "\n")
 }
 # 
 # combineProgress <- function(iterator){
@@ -34,20 +37,36 @@ writeReferencesDf <- function(bib_df, out_filename){
 #   }
 # }
 
-updateReferences <- function(bib_filename, out_filename, style="acm", upd_bibkey=FALSE, upd_title=FALSE, upd_author=TRUE, upd_abstract=FALSE, sorting_key=NULL, decreasing=FALSE, multithreaded=TRUE, workers_log_folder=".\\"){
+readBibAsDf <- function(bib_filename, encoding = "UTF-8"){
+  bib_data <- ReadBib(bib_filename, .Encoding=encoding, check=FALSE) # best way to parse
+  cat("\nTotal Refs in bib file: ", length(bib_data))
+  str_list <- foreach(i=1:length(bib_data)) %do% {
+    tryCatch({
+      entry_data <- getReferenceListData(bib_data[[i]])
+      ret_list <- list(bib_key=entry_data)
+      names(ret_list) <- names(bib_data[[i]])
+      return(ret_list)
+    },error= function(e){
+      cat("\nError in getting bib entry ", names(bib_data[[i]]), ":", paste0(e))
+    })
+  }
+  ref_list <- unlist(str_list, recursive=FALSE)
+  bib_df <- data.table::rbindlist(ref_list, fill=TRUE)
+  cat("\nTotal Refs in dataframe file: ", nrow(bib_df))
+  return(bib_df)
+}
+
+cleanUpdateReferences <- function(bib_df, out_filename, style="acm", upd_bibkey=FALSE, upd_title=FALSE, upd_author=TRUE, upd_abstract=FALSE, sorting_key=NULL, decreasing=FALSE, multithreaded=TRUE, workers_log_folder=".\\"){
   source("references_cleane.R")
   start_time <- Sys.time()
-  bib_data <- ReadBib(bib_filename, check=FALSE) # best way to parse
-  cat("\nTotal references in ", bib_filename, ": ", length(bib_data))
-  write("", file = out_filename, append = FALSE)
   
   if(!multithreaded){
     method <- "Single"
-    str_list <- foreach(i=1:length(bib_data)) %do% {
+    str_list <- foreach(i=1:nrow(bib_df)) %do% {
       tryCatch({
-        updateBibEntry(bib_data, i, out_filename, style, upd_bibkey, upd_title, upd_author, upd_abstract, is_cluster=FALSE)
+        updateBibEntry(bib_df, i, out_filename, style, upd_bibkey, upd_title, upd_author, upd_abstract, is_cluster=FALSE)
       },error= function(e){
-        cat("\nError in updating bib entry ", names(bib_data[[i]]), ":", paste0(e))
+        cat("\nError in updating bib entry ", bib_df[1, "bibkey"][[1]], ":", paste0(e))
       })
     }
   }
@@ -59,7 +78,7 @@ updateReferences <- function(bib_filename, out_filename, style="acm", upd_bibkey
     do.call(file.remove, list(list.files(workers_log_folder, full.names = TRUE, pattern="*.log")))
     cl <- makeCluster(cores[1]-1) #not to overload your computer
     registerDoParallel(cl)
-    str_list <- foreach(i=1:length(bib_data)) %dopar% {
+    str_list <- foreach(i=1:nrow(bib_df)) %dopar% {
       source("references_cleane.R")
       if(!exists("log_file_initialized")){
         log_filename <- paste0(length(list.files(workers_log_folder, full.names = FALSE))+1, ".log")
@@ -68,10 +87,10 @@ updateReferences <- function(bib_filename, out_filename, style="acm", upd_bibkey
         log_file_initialized <- TRUE
       }
       tryCatch({
-        entry <- updateBibEntry(bib_data, i, out_filename, style, upd_bibkey, upd_title, upd_author, upd_abstract, is_cluster=TRUE)
+        entry <- updateBibEntry(bib_df, i, out_filename, style, upd_bibkey, upd_title, upd_author, upd_abstract, is_cluster=TRUE)
         return(entry)
       },error= function(e){
-        cat("\nError in updating bib entry ", names(bib_data[[i]]), ":", paste0(e))
+        cat("\nError in updating bib entry ", bib_df[1, "bibkey"][[1]], ":", paste0(e))
       })
     }
     stopCluster(cl)
@@ -88,8 +107,7 @@ updateReferences <- function(bib_filename, out_filename, style="acm", upd_bibkey
   }
   
   # writeReferences(str_list, out_filename)
-  writeReferencesDf(df, out_filename)
-  cat("\nReferences written to file: ", out_filename, "\n")
+  writeReferencesDf(df, out_filename, append=FALSE)
   
   end_time <- Sys.time()
   cat("\n\n", method, "threaded execution time: ", end_time - start_time, "\n\n")
