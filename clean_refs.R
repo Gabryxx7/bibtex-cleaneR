@@ -31,7 +31,6 @@ filename <- "sample-base"
 workers_log_folder = paste0(base_folder, "workers_log_", filename, "\\")
 in_file <- paste0(base_folder, filename, ".bib")
 out_file <- paste0(base_folder, filename, "_out", ".bib", sep="")
-
 sample_bib_df <- readBibAsDf(in_file, encoding = "UTF-8")
 sample_bib_df_clean <- cleanUpdateReferences(sample_bib_df, out_file, style=style,
                                              upd_bibkey=upd_bibkey, upd_title=upd_title, upd_author=upd_author, upd_abstract=upd_abstract,

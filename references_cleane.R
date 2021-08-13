@@ -142,22 +142,23 @@ mergeReferencesClass <- function(old_bib, new_bib, upd_bibkey=FALSE, upd_title=F
   return(old_bib_unclassed)
 }
 
-mergeReferencesDF <- function(old_bib, new_bib, upd_bibkey=FALSE, upd_title=FALSE, upd_authors=TRUE, verbose=FALSE){
+mergeReferencesDF <- function(old_bib, new_bib, upd_bibkey=FALSE, upd_title=FALSE, upd_authors=TRUE, verbose=TRUE){
   for(field in colnames(new_bib)){
-    if(field == "title" && !upd_title || field == "author" && !upd_authors){
-      cat("\n--Not Updating ", field)
-      next
-    }
-    if(verbose){
-      cat("Updating field", field, "\tOld: ", paste0(old_bib[[field]]), "\tNew: ", paste0(new_bib[[field]]), "\n")
-    }
-    if(!is.null(new_bib[[field]]) && !is.na(new_bib[[field]])){
-      old_bib[[field]] <- str_replace_all(new_bib[[field]], "[{|}]", "")
-    }
-  }
-  if(upd_bibkey){
-    cat("\n--Updating bibkey: ", old_bib[["bibkey"]], "=>", new_bib[["bibkey"]] )
-    old_bib[["bibkey"]] <- new_bib[["bibkey"]] 
+      tryCatch({
+        if(field == "bibkey" && !upd_bibkey || field == "title" && !upd_title || field == "author" && !upd_authors){
+          cat("\n--Not Updating ", field)
+          next
+        }
+        if(!is.null(new_bib[[field]]) && !is.na(new_bib[[field]])){
+          replacement <- str_replace_all(new_bib[[field]], "[{|}]", "")
+          if(verbose){
+            cat("\nUpdating field", field, "\t\'", paste0(old_bib[[field]]), "\' => \'", paste0(replacement), "\'")
+          }
+          old_bib[[field]] <- replacement
+        }
+      }, error = function(e){
+        cat("\n--Error updating DF ", field, ": ", paste0(e))
+    })
   }
   return(old_bib)
 }
@@ -193,7 +194,7 @@ updateBibEntry <- function(bib_data, index, out_file, style="acm", upd_bibkey=FA
   field <- "doi"
   doi <- cleanDoiUrl(doi=bib_entry$doi)
   title <- str_replace_all(bib_entry$title, "[{|}]", "")
-  if(is.null(doi) || length(doi) <= 0 ){
+  if(is.na(doi) || is.null(doi) || length(doi) <= 0 ){
     tryCatch({
       field <- "url"
       doi <- cleanDoiUrl(url=bib_entry$url)
@@ -202,7 +203,7 @@ updateBibEntry <- function(bib_data, index, out_file, style="acm", upd_bibkey=FA
       url <- NULL
     })
   }
-  if(is.null(doi) || length(doi) <= 0 ){
+  if(is.na(doi) || is.null(doi) || length(doi) <= 0 ){
     if(is.null(title) || length(title) <= 0 ){
       cat(paste0("\nNo DOI and no TITLE found, skipping\n"))
     }
@@ -240,11 +241,14 @@ updateBibEntry <- function(bib_data, index, out_file, style="acm", upd_bibkey=FA
   if(!is.null(new_entry) && length(new_entry) > 0){
     tryCatch({
       # bib_entry <- mergeReferencesClass(bib_entry, new_entry, upd_bibkey, upd_title, upd_author, verbose=FALSE)
-      bib_entry <- mergeReferencesDF(bib_entry, new_entry, upd_bibkey, upd_title, upd_author, verbose=FALSE)
+      bib_entry <- mergeReferencesDF(bib_entry, new_entry, upd_bibkey, upd_title, upd_author, verbose=TRUE)
       if(upd_abstract){
-        new_abstr <- getAbstractFromDOI(bib_entry$doi)
         tryCatch({
-          bib_entry[["abstract"]] <- new_abstr
+          new_abstr <- getAbstractFromDOI(bib_entry$doi)
+          if(!is.null(new_abstr)){
+            bib_entry[["abstract"]] <- new_abstr
+            cat("\nAbstract updated")
+          }
         }, error = function(e) {
           cat("\nError updating abstract: ", paste0(e))
         })
