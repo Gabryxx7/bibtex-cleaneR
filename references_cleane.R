@@ -152,6 +152,7 @@ mergeReferencesDF <- function(old_bib, new_bib, upd_bibkey=FALSE, upd_title=FALS
         }
         if(!is.null(new_bib[[field]]) && !is.na(new_bib[[field]])){
           replacement <- str_replace_all(new_bib[[field]], "[{|}]", "")
+          replacement <- str_replace_all(new_bib[[field]], "\textsinglequote", "\'")
           if(verbose){
             cat("\nUpdating field", field, "\t\'", paste0(old_bib[[field]]), "\' => \'", paste0(replacement), "\'")
           }
@@ -187,8 +188,11 @@ cleanDoiUrl <- function(doi=NULL, url=NULL){
 }
 
 
-updateBibEntry <- function(bib_data, index, out_file, style="acm", upd_bibkey=FALSE, upd_title=FALSE, upd_author=TRUE, upd_abstract=FALSE, is_cluster=FALSE){
+updateBibEntry <- function(bib_data, index, out_file, style="acm", upd_bibkey=FALSE, upd_title=FALSE, upd_author=TRUE, upd_abstract=FALSE, is_cluster=FALSE, wd=NA){
   if(is_cluster){
+    if(!is.na(wd)){
+      setwd(wd)
+    }
     source("references_cleane.R")
   }
   bib_entry <- bib_data[index]
@@ -213,7 +217,7 @@ updateBibEntry <- function(bib_data, index, out_file, style="acm", upd_bibkey=FA
     }
     else{
       cat(paste0("\nNo DOI FOUND, looking for it on CrossRef and ARXIV, query: ", title, "\n"))
-      resCR <- cr_works(query = title, format = "text", style = "acm", limit=10) # https://docs.ropensci.org/rcrossref/reference/cr_works.html
+      resCR <- cr_works(query = title, format = "text", limit=10) # https://docs.ropensci.org/rcrossref/reference/cr_works.html
       # resPlos <- ft_search(query = title, from="plos")
       resArxiv <- arxiv_search(query = noquote(paste0('ti:\"', title, '\"')), limit=10)
       dois <- list(c(resArxiv$doi, resCR$data$doi))
