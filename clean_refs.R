@@ -1,4 +1,4 @@
-base_folder = "C:\\Users\\Gabryxx7\\Documents\\GitHub\\bibtext-cleaneR\\"
+base_folder = dirname(rstudioapi::getActiveDocumentContext()$path)
 setwd(base_folder)
 
 source("main.R")
