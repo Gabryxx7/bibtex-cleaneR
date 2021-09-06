@@ -5,9 +5,10 @@ library(stringi)
 library(shinyAce)
 library(rcrossref)
 init <- paste(readLines('example.bib', encoding = "UTF-8"), collapse = "\n")
+in_bibtex <- init
+out_bibtex <- ""
 
-setwd(dirname(rstudioapi::getActiveDocumentContext()$path))
-setwd("../")
+setwd("/home/shiny/shiny-apps/bibtex_cleaner/bibtex-cleaneR/")
 cat(getwd())
 
 source("main.R")
