@@ -1,4 +1,5 @@
 base_folder = dirname(rstudioapi::getActiveDocumentContext()$path)
+base_folder = paste0(base_folder, "/")
 setwd(base_folder)
 
 source("main.R")
@@ -15,8 +16,8 @@ decreasing <- FALSE
 
 
 
-filename <- "test"
-workers_log_folder = paste0(base_folder, "workers_log_", filename, "\\")
+filename <- "sample-base"
+workers_log_folder = paste0(base_folder, "workers_log_", filename, "/")
 in_file <- paste0(base_folder, filename, ".bib")
 out_file <- paste0(base_folder, filename, "_out", ".bib", sep="")
 test_bib_df <- readBibAsDf(in_file, encoding = "UTF-8")
