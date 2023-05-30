@@ -38,7 +38,7 @@ writeReferencesDf <- function(bib_df, out_filename=NULL, append=FALSE){
     return(out_str)
   }
 }
-# 
+#
 # combineProgress <- function(iterator){
 #   pb <- txtProgressBar(min = 1, max = iterator - 1, style = 3)
 #   count <- 0
@@ -71,7 +71,7 @@ readBibAsDf <- function(bib_filename, encoding = "UTF-8"){
   return(bib_df)
 }
 
-cleanUpdateReferences <- function(bib_df, out_filename, style="acm", upd_bibkey=FALSE, upd_title=FALSE, upd_author=TRUE, upd_abstract=FALSE, sorting_key=NULL, decreasing=FALSE, multithreaded=TRUE, workers_log_folder=".\\", wd=NA){
+cleanUpdateReferences <- function(in_filename, out_filename=NULL, style="acm", upd_bibkey=FALSE, upd_title=TRUE, upd_author=TRUE, upd_abstract=TRUE, sorting_key=NULL, decreasing=FALSE, multithreaded=TRUE, base_folder=".\\", wd=NA){
   if(!is.na(wd)){
     cat("\n")
     cat(wd)
@@ -81,7 +81,20 @@ cleanUpdateReferences <- function(bib_df, out_filename, style="acm", upd_bibkey=
   }
   source("references_cleane.R")
   start_time <- Sys.time()
-  
+  if(!grepl('\\.bib',  in_filename)){
+    in_filename <- paste0(in_filename, '.bib')
+  }
+  if(is.null(out_filename)){
+    out_filename <- str_replace(in_filename, "\\.bib", "_out.bib")
+  }
+  else if(!grepl('\\.bib',  out_filename)){
+    out_filename <- paste0(out_filename, '.bib')
+  }
+  in_filename <- paste0(base_folder, in_filename)
+  out_filename <- paste0(base_folder, out_filename)
+  cat(paste0("\n- Input File: ", in_filename))
+  cat(paste0("\n- Output File: ", out_filename))
+  bib_df <- readBibAsDf(in_filename, encoding = "UTF-8")
   if(!multithreaded){
     method <- "Single"
     str_list <- foreach(i=1:nrow(bib_df)) %do% {
@@ -96,11 +109,15 @@ cleanUpdateReferences <- function(bib_df, out_filename, style="acm", upd_bibkey=
     method <- "Multi"
     cat("\nCores: ", detectCores(), "\tRefs: ", nrow(bib_df))
     cores=min(detectCores()[1]-1, nrow(bib_df))
+    logs_folder <- paste0(base_folder, "logs", "/")
+    dir.create(file.path(logs_folder), showWarnings = FALSE)
+    workers_log_folder <- paste0(logs_folder, "workers_log_", filename, "/")
     cat("\n",cores," Workers log to: ", workers_log_folder, "\n- Cleaning up folder...")
     dir.create(file.path(workers_log_folder), showWarnings = FALSE)
     do.call(file.remove, list(list.files(workers_log_folder, full.names = TRUE, pattern="*.log")))
     cl <- makeCluster(cores) #not to overload your computer
     registerDoParallel(cl)
+    cat("\n- Starting ref cleaning...")
     str_list <- foreach(i=1:nrow(bib_df)) %dopar% {
       if(!is.na(wd)){
         setwd(wd)
@@ -109,7 +126,7 @@ cleanUpdateReferences <- function(bib_df, out_filename, style="acm", upd_bibkey=
       if(!exists("log_file_initialized")){
         log_filename <- paste0(length(list.files(workers_log_folder, full.names = FALSE))+1, ".log")
         file.create(paste0(workers_log_folder, log_filename))
-        sink(paste0(workers_log_folder, log_filename), append = FALSE)   
+        sink(paste0(workers_log_folder, log_filename), append = FALSE)
         log_file_initialized <- TRUE
       }
       tryCatch({
@@ -121,19 +138,19 @@ cleanUpdateReferences <- function(bib_df, out_filename, style="acm", upd_bibkey=
     }
     stopCluster(cl)
   }
-  
+
   cat("\nTotal Refs before sorting: ", length(str_list))
   ref_list <- unlist(str_list, recursive=FALSE)
   cat("\nTotal unlisted Refs before sorting: ", length(ref_list))
   df <- data.table::rbindlist(ref_list, fill=TRUE)
   sorting_key <- tolower(sorting_key)
   df[is.na(df$r_updated)]$r_updated <- "NO"
-  
+
   df <- sort_references(df, sorting_key, decreasing)
-  
+
   # writeReferences(str_list, out_filename)
   writeReferencesDf(df, out_filename, append=FALSE)
-  
+
   end_time <- Sys.time()
   cat("\n\n", method, "threaded execution time: ", end_time - start_time, "\n\n")
   return(df)

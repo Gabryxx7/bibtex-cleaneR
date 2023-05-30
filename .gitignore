@@ -2,3 +2,6 @@
 *.log
 .RData
 .Rhistory
+.Rproj.user
+Out/
+logs/
